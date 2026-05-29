@@ -4,7 +4,6 @@ return [
     // Nav & page titles
     'Redirects' => 'Redirects',
     'Import' => 'Importeren',
-    '404 Log' => '404 Log',
     'Import Redirects' => 'Redirects importeren',
     'Map CSV Columns' => 'CSV-kolommen koppelen',
     'Import Results' => 'Importresultaten',
@@ -13,13 +12,11 @@ return [
 
     // Buttons & actions
     'Export CSV' => 'CSV exporteren',
-    'New redirect' => 'Nieuwe redirect',
     'Enable' => 'Inschakelen',
     'Disable' => 'Uitschakelen',
     'Delete' => 'Verwijderen',
     'Change type' => 'Type wijzigen',
     'Edit' => 'Bewerken',
-    'Import' => 'Importeren',
     'Cancel' => 'Annuleren',
     'Import more' => 'Meer importeren',
     'View redirects' => 'Redirects bekijken',
@@ -36,11 +33,7 @@ return [
     'Type' => 'Type',
     'Match' => 'Match',
     'Label' => 'Label',
-    'Hits' => 'Hits',
-    'Last Hit' => 'Laatste hit',
     'Notes' => 'Notities',
-    'Created' => 'Aangemaakt',
-    'Created by' => 'Aangemaakt door',
     'URL' => 'URL',
     'First Seen' => 'Eerste keer gezien',
     'Row' => 'Rij',
@@ -63,7 +56,6 @@ return [
 
     // Search
     'Search redirects...' => 'Redirects zoeken...',
-    'Search 404s...' => '404s zoeken...',
 
     // Flash messages & notifications
     'Redirect saved.' => 'Redirect opgeslagen.',

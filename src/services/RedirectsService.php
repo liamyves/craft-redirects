@@ -151,12 +151,6 @@ class RedirectsService extends Component
         $record->notes = $model->notes;
         $record->enabled = $model->enabled;
 
-        // Set createdById on new records
-        if (!$model->id && !$model->createdById) {
-            $currentUser = Craft::$app->getUser()->getIdentity();
-            $record->createdById = $currentUser?->id;
-        }
-
         if (!$record->save()) {
             $model->addErrors($record->getErrors());
             return false;
@@ -172,16 +166,6 @@ class RedirectsService extends Component
         $record = RedirectRecord::findOne($id);
 
         return $record ? (bool)$record->delete() : false;
-    }
-
-    public function recordHit(int $id): void
-    {
-        Craft::$app->getDb()->createCommand()
-            ->update('{{%redirects}}', [
-                'hitCount' => new Expression('[[hitCount]] + 1'),
-                'lastHitAt' => (new \DateTime())->format('Y-m-d H:i:s'),
-            ], ['id' => $id], [], false)
-            ->execute();
     }
 
     /**
@@ -249,7 +233,7 @@ class RedirectsService extends Component
         $redirects = $this->getAllRedirects($siteId);
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'site', 'label', 'notes', 'enabled', 'hits', 'lastHit', 'created']);
+        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'site', 'label', 'notes', 'enabled']);
 
         foreach ($redirects as $redirect) {
             $siteHandle = '';
@@ -267,9 +251,6 @@ class RedirectsService extends Component
                 $redirect->label,
                 $redirect->notes,
                 $redirect->enabled ? 'yes' : 'no',
-                $redirect->hitCount,
-                $redirect->lastHitAt ?? '',
-                $redirect->dateCreated ?? '',
             ]);
         }
 
@@ -340,15 +321,6 @@ class RedirectsService extends Component
         $model->label = $record->label;
         $model->notes = $record->notes;
         $model->enabled = (bool)$record->enabled;
-        $model->hitCount = (int)$record->hitCount;
-        $model->lastHitAt = $record->lastHitAt;
-        $model->createdById = $record->createdById ? (int)$record->createdById : null;
-        if ($model->createdById) {
-            $user = Craft::$app->getUsers()->getUserById($model->createdById);
-            $model->createdByName = $user?->fullName ?: $user?->username;
-        }
-        $model->dateCreated = $record->dateCreated;
-        $model->dateUpdated = $record->dateUpdated;
 
         return $model;
     }
