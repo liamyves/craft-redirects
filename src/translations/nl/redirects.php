@@ -4,7 +4,6 @@ return [
     // Nav & page titles
     'Redirects' => 'Redirects',
     'Import' => 'Importeren',
-    '404 Log' => '404 Log',
     'Import Redirects' => 'Redirects importeren',
     'Map CSV Columns' => 'CSV-kolommen koppelen',
     'Import Results' => 'Importresultaten',
@@ -13,20 +12,16 @@ return [
 
     // Buttons & actions
     'Export CSV' => 'CSV exporteren',
-    'New redirect' => 'Nieuwe redirect',
     'Enable' => 'Inschakelen',
     'Disable' => 'Uitschakelen',
     'Delete' => 'Verwijderen',
     'Change type' => 'Type wijzigen',
     'Edit' => 'Bewerken',
-    'Import' => 'Importeren',
     'Cancel' => 'Annuleren',
     'Import more' => 'Meer importeren',
     'View redirects' => 'Redirects bekijken',
     'Upload & Preview' => 'Uploaden & Voorbeeld',
     'Download example CSV' => 'Voorbeeld CSV downloaden',
-    'Create redirect' => 'Redirect aanmaken',
-    'Clear all' => 'Alles wissen',
     'Skip' => 'Overslaan',
 
     // Table headers
@@ -36,13 +31,7 @@ return [
     'Type' => 'Type',
     'Match' => 'Match',
     'Label' => 'Label',
-    'Hits' => 'Hits',
-    'Last Hit' => 'Laatste hit',
     'Notes' => 'Notities',
-    'Created' => 'Aangemaakt',
-    'Created by' => 'Aangemaakt door',
-    'URL' => 'URL',
-    'First Seen' => 'Eerste keer gezien',
     'Row' => 'Rij',
     'Data' => 'Data',
     'Errors' => 'Fouten',
@@ -63,7 +52,6 @@ return [
 
     // Search
     'Search redirects...' => 'Redirects zoeken...',
-    'Search 404s...' => '404s zoeken...',
 
     // Flash messages & notifications
     'Redirect saved.' => 'Redirect opgeslagen.',
@@ -77,10 +65,6 @@ return [
     'Bulk action failed.' => 'Bulkactie mislukt.',
     'Are you sure you want to delete these redirects?' => 'Weet je zeker dat je deze redirects wilt verwijderen?',
     'Are you sure you want to delete this redirect?' => 'Weet je zeker dat je deze redirect wilt verwijderen?',
-    '404 entry removed.' => '404-vermelding verwijderd.',
-    'Could not delete 404 entry.' => '404-vermelding kon niet worden verwijderd.',
-    'Are you sure you want to clear all 404 entries?' => 'Weet je zeker dat je alle 404-vermeldingen wilt wissen?',
-    'Could not clear 404 log.' => '404 log kon niet worden gewist.',
 
     // Import messages
     'No file uploaded.' => 'Geen bestand geüpload.',
@@ -122,10 +106,6 @@ return [
     'Exact match' => 'Exacte match',
     'Regex pattern' => 'Regex-patroon',
 
-    // Settings
-    '404 Logging' => '404 Logging',
-    'Log all 404 (not found) requests.' => 'Log alle 404 (niet gevonden) verzoeken.',
-
     // Test redirect
     'Test URL' => 'URL testen',
     'Test' => 'Testen',
@@ -136,5 +116,4 @@ return [
 
     // Empty states
     'No redirects yet.' => 'Nog geen redirects.',
-    'No 404s logged yet.' => 'Nog geen 404s gelogd.',
 ];

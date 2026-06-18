@@ -36,13 +36,11 @@ class RedirectsController extends Controller
         } else {
             $redirect = new RedirectModel();
 
-            // Pre-fill fromUrl from query param (e.g. from 404 log)
             $fromUrl = Craft::$app->getRequest()->getQueryParam('fromUrl');
             if ($fromUrl) {
                 $redirect->fromUrl = $fromUrl;
             }
 
-            // Pre-fill siteId from query param (e.g. from 404 log)
             $siteId = Craft::$app->getRequest()->getQueryParam('siteId');
             if ($siteId !== null && $siteId !== '') {
                 $redirect->siteId = (int)$siteId;
@@ -371,43 +369,4 @@ class RedirectsController extends Controller
         ]);
     }
 
-    // --- 404 Log ---
-
-    public function action404s(): Response
-    {
-        $siteId = Craft::$app->getRequest()->getQueryParam('siteId');
-        $siteId = $siteId !== null && $siteId !== '' ? (int)$siteId : null;
-
-        $notFounds = Redirects::getInstance()->notFoundService->getAllNotFounds($siteId);
-
-        return $this->renderTemplate('redirects/_404s', [
-            'notFounds' => $notFounds,
-            'sites' => Craft::$app->getSites()->getAllSites(),
-            'selectedSiteId' => $siteId,
-        ]);
-    }
-
-    public function actionDelete404(): Response
-    {
-        $this->requirePostRequest();
-        $this->requireAcceptsJson();
-
-        $id = Craft::$app->getRequest()->getRequiredBodyParam('id');
-        Redirects::getInstance()->notFoundService->deleteNotFoundById((int)$id);
-
-        return $this->asJson(['success' => true]);
-    }
-
-    public function actionDeleteAll404s(): Response
-    {
-        $this->requirePostRequest();
-        $this->requireAcceptsJson();
-
-        $siteId = Craft::$app->getRequest()->getBodyParam('siteId');
-        $siteId = $siteId !== null && $siteId !== '' ? (int)$siteId : null;
-
-        Redirects::getInstance()->notFoundService->deleteAllNotFounds($siteId);
-
-        return $this->asJson(['success' => true]);
-    }
 }
