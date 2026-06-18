@@ -1,7 +1,6 @@
 {
 	"name": "recranet/craft-redirects",
 	"description": "Simple redirect management for Craft CMS",
-	"version": "1.2.0",
 	"license": "MIT",
 	"type": "craft-plugin",
 	"require": {
