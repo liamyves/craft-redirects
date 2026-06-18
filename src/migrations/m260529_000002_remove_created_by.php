@@ -8,10 +8,7 @@ class m260529_000002_remove_created_by extends Migration
 {
     public function safeUp(): bool
     {
-        $this->dropForeignKey(
-            $this->db->getForeignKeyName('{{%redirects}}', 'createdById'),
-            '{{%redirects}}'
-        );
+         $this->dropForeignKeyIfExists("{{%redirects}}", 'createdById');
         $this->dropColumn('{{%redirects}}', 'createdById');
 
         return true;

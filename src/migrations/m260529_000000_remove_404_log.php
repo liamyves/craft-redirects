@@ -15,6 +15,18 @@ class m260529_000000_remove_404_log extends Migration
 
     public function safeDown(): bool
     {
+        $this->createTable('{{%redirects_404s}}', [
+            'id' => $this->primaryKey(),
+            'url' => $this->string(500)->notNull(),
+            'hitCount' => $this->integer()->notNull()->defaultValue(1),
+            'lastHitAt' => $this->dateTime()->notNull(),
+            'dateCreated' => $this->dateTime()->notNull(),
+            'dateUpdated' => $this->dateTime()->notNull(),
+            'uid' => $this->uid(),
+        ]);
+
+        $this->createIndex(null, '{{%redirects_404s}}', ['url'], true);
+
         return true;
     }
 }
