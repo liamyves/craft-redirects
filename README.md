@@ -48,6 +48,8 @@ Create and manage redirects. Each redirect has:
 
 **Exact match** redirects are case-insensitive and normalize trailing slashes — `/old-page` and `/old-page/` are treated the same.
 
+**Query strings are preserved**: `/old-page?utm_source=x` redirects to the destination with `?utm_source=x` appended (merged with `&` if the destination already has a query string).
+
 **Regex match** redirects use PCRE patterns. Captured groups can be referenced in the destination URL:
 
 | From URL             | To URL            | Example                                          |

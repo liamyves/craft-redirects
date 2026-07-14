@@ -207,7 +207,15 @@ class Redirects extends Plugin
                     $redirect = $this->redirectsService->findRedirectByPath($path, $siteId, $request->getHostInfo());
 
                     if ($redirect) {
-                        Craft::$app->getResponse()->redirect($redirect->toUrl, $redirect->type);
+                        $toUrl = $redirect->toUrl;
+
+                        // Preserve the incoming query string (e.g. utm parameters)
+                        $queryString = $request->getQueryStringWithoutPath();
+                        if ($queryString) {
+                            $toUrl .= (str_contains($toUrl, '?') ? '&' : '?') . $queryString;
+                        }
+
+                        Craft::$app->getResponse()->redirect($toUrl, $redirect->type);
                         Craft::$app->end();
                     }
                 } catch (\Throwable $e) {
