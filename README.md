@@ -42,6 +42,7 @@ Create and manage redirects. Each redirect has:
 | To URL      | The destination URL                                                  |
 | Type        | HTTP status code (301, 302, 307, 308)                                |
 | Match Type  | `exact` or `regex`                                                   |
+| Priority    | Order for overlapping regex patterns — lower numbers are checked first |
 | Label       | Optional label for organization                                      |
 | Notes       | Optional notes                                                       |
 | Expiry date | Optional — after this date the redirect stops matching               |
@@ -55,6 +56,8 @@ Create and manage redirects. Each redirect has:
 | From URL             | To URL            | Example                                          |
 | -------------------- | ----------------- | ------------------------------------------------ |
 | `/blog/(\d{4})/(.*)` | `/articles/$1/$2` | `/blog/2024/my-post` -> `/articles/2024/my-post` |
+
+When multiple regex patterns could match the same URL, the **Priority** field decides the order: lower numbers are checked first. Ties fall back to site-specific before global, then oldest first — so the result is always deterministic.
 
 ### Automatic redirects
 

@@ -120,6 +120,7 @@ class RedirectsService extends Component
         $record->toUrl = $model->toUrl;
         $record->type = $model->type;
         $record->matchType = $model->matchType;
+        $record->priority = $model->priority;
         $record->label = $model->label;
         $record->notes = $model->notes;
         $record->enabled = $model->enabled;
@@ -289,7 +290,7 @@ class RedirectsService extends Component
         $redirects = $this->getAllRedirects($siteId);
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'site', 'label', 'notes', 'enabled', 'expiryDate']);
+        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'priority', 'site', 'label', 'notes', 'enabled', 'expiryDate']);
 
         foreach ($redirects as $redirect) {
             $siteHandle = '';
@@ -303,6 +304,7 @@ class RedirectsService extends Component
                 $redirect->toUrl,
                 $redirect->type,
                 $redirect->matchType,
+                $redirect->priority,
                 $siteHandle,
                 $redirect->label,
                 $redirect->notes,
@@ -329,6 +331,7 @@ class RedirectsService extends Component
             $model->toUrl = $row['toUrl'] ?? null;
             $model->type = !empty($row['type']) ? (int)$row['type'] : 301;
             $model->matchType = $row['matchType'] ?? 'exact';
+            $model->priority = isset($row['priority']) && $row['priority'] !== '' ? (int)$row['priority'] : 0;
             $model->label = $row['label'] ?? null;
             $model->notes = $row['notes'] ?? null;
 
@@ -379,6 +382,7 @@ class RedirectsService extends Component
         $model->toUrl = $row['toUrl'];
         $model->type = (int)$row['type'];
         $model->matchType = $row['matchType'] ?? 'exact';
+        $model->priority = (int)($row['priority'] ?? 0);
         $model->label = $row['label'] ?? null;
         $model->notes = $row['notes'] ?? null;
         $model->enabled = (bool)$row['enabled'];
@@ -396,6 +400,7 @@ class RedirectsService extends Component
         $model->toUrl = $record->toUrl;
         $model->type = $record->type;
         $model->matchType = $record->matchType ?? 'exact';
+        $model->priority = (int)($record->priority ?? 0);
         $model->label = $record->label;
         $model->notes = $record->notes;
         $model->enabled = (bool)$record->enabled;

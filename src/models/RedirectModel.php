@@ -13,6 +13,7 @@ class RedirectModel extends Model
     public ?string $toUrl = null;
     public int $type = 302;
     public string $matchType = 'exact';
+    public int $priority = 0;
     public ?string $label = null;
     public ?string $notes = null;
     public bool $enabled = true;
@@ -74,6 +75,7 @@ class RedirectModel extends Model
             ],
             ['type', 'in', 'range' => [301, 302, 307, 308]],
             ['matchType', 'in', 'range' => ['exact', 'regex']],
+            ['priority', 'integer'],
             ['label', 'string', 'max' => 255],
             ['notes', 'safe'],
             ['enabled', 'boolean'],

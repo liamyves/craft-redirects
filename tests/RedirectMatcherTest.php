@@ -223,6 +223,46 @@ class RedirectMatcherTest extends TestCase
         $this->assertNull(RedirectMatcher::match([$row], '/blog/post', null, null, $now));
     }
 
+    public function testRegexPriorityOrdersOverlappingPatterns(): void
+    {
+        $broad = $this->row(['id' => 1, 'matchType' => 'regex', 'priority' => 10, 'fromUrl' => '^/blog/(.*)$', 'toUrl' => '/articles/$1']);
+        $specific = $this->row(['id' => 2, 'matchType' => 'regex', 'priority' => 5, 'fromUrl' => '^/blog/archive/(.*)$', 'toUrl' => '/archive/$1']);
+
+        $match = RedirectMatcher::match([$broad, $specific], '/blog/archive/old-post');
+
+        $this->assertSame('/archive/old-post', $match['toUrl']);
+    }
+
+    public function testRegexPriorityBeatsSitePriority(): void
+    {
+        $siteSpecific = $this->row(['id' => 1, 'matchType' => 'regex', 'siteId' => 1, 'priority' => 10, 'fromUrl' => '^/blog/.*$', 'toUrl' => '/site']);
+        $global = $this->row(['id' => 2, 'matchType' => 'regex', 'siteId' => null, 'priority' => 1, 'fromUrl' => '^/blog/.*$', 'toUrl' => '/global']);
+
+        $match = RedirectMatcher::match([$siteSpecific, $global], '/blog/post', 1);
+
+        $this->assertSame('/global', $match['toUrl']);
+    }
+
+    public function testEqualPriorityFallsBackToSiteThenId(): void
+    {
+        $globalOld = $this->row(['id' => 1, 'matchType' => 'regex', 'siteId' => null, 'fromUrl' => '^/blog/.*$', 'toUrl' => '/global-old']);
+        $siteNew = $this->row(['id' => 2, 'matchType' => 'regex', 'siteId' => 1, 'fromUrl' => '^/blog/.*$', 'toUrl' => '/site-new']);
+
+        $match = RedirectMatcher::match([$globalOld, $siteNew], '/blog/post', 1);
+
+        $this->assertSame('/site-new', $match['toUrl']);
+    }
+
+    public function testEqualPriorityAndSiteFallsBackToOldestId(): void
+    {
+        $older = $this->row(['id' => 1, 'matchType' => 'regex', 'fromUrl' => '^/blog/.*$', 'toUrl' => '/older']);
+        $newer = $this->row(['id' => 2, 'matchType' => 'regex', 'fromUrl' => '^/blog/.*$', 'toUrl' => '/newer']);
+
+        $match = RedirectMatcher::match([$newer, $older], '/blog/post');
+
+        $this->assertSame('/older', $match['toUrl']);
+    }
+
     // --- Query string handling ---
 
     public function testAppendQueryString(): void

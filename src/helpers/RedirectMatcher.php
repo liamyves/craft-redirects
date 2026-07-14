@@ -71,8 +71,12 @@ final class RedirectMatcher
             return $exactMatches[0];
         }
 
-        // Regex matches: site-specific first, matched against the path and the full URL
-        usort($regexRows, fn(array $a, array $b) => (($a['siteId'] ?? null) === null) <=> (($b['siteId'] ?? null) === null));
+        // Regex matches, in deterministic order: priority (lower first),
+        // then site-specific before global, then oldest first
+        usort($regexRows, function (array $a, array $b) {
+            return [(int)($a['priority'] ?? 0), ($a['siteId'] ?? null) === null, (int)($a['id'] ?? 0)]
+                <=> [(int)($b['priority'] ?? 0), ($b['siteId'] ?? null) === null, (int)($b['id'] ?? 0)];
+        });
 
         $subjects = [$path];
         if ($hostInfo) {

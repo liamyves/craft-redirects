@@ -76,9 +76,10 @@
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 4 : 3 }}">{{ 'To'|t('redirects') }}</th>
                     <th class="sortable" data-sort="number" data-index="{{ sites|length > 1 ? 5 : 4 }}">{{ 'Type'|t('redirects') }}</th>
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 6 : 5 }}">{{ 'Match'|t('redirects') }}</th>
-                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 7 : 6 }}">{{ 'Label'|t('redirects') }}</th>
-                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 8 : 7 }}">{{ 'Notes'|t('redirects') }}</th>
-                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 9 : 8 }}">{{ 'Expires'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="number" data-index="{{ sites|length > 1 ? 7 : 6 }}">{{ 'Priority'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 8 : 7 }}">{{ 'Label'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 9 : 8 }}">{{ 'Notes'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 10 : 9 }}">{{ 'Expires'|t('redirects') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -100,6 +101,7 @@
                         <td>{{ redirect.toUrl }}</td>
                         <td>{{ redirect.type }}</td>
                         <td>{{ redirect.matchType }}</td>
+                        <td>{{ redirect.priority }}</td>
                         <td>{{ redirect.label ?? '' }}</td>
                         <td>{{ redirect.notes }}</td>
                         <td{% if redirect.expiryDate and redirect.expiryDate < now %} style="color: #dc2626;"{% endif %}>

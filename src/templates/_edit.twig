@@ -67,6 +67,17 @@
         placeholder: redirect.matchType == 'regex' ? '/articles/$1' : '/new-page or https://example.com',
     }) }}
 
+    {{ forms.textField({
+        label: 'Priority'|t('redirects'),
+        instructions: 'Order for regex patterns when multiple could match: lower numbers are checked first. Ignored for exact matches. Default 0.'|t('redirects'),
+        id: 'priority',
+        name: 'priority',
+        type: 'number',
+        value: redirect.priority,
+        size: 5,
+        errors: redirect.getErrors('priority'),
+    }) }}
+
     {{ forms.selectField({
         label: 'Type'|t('redirects'),
         instructions: 'The HTTP status code for the redirect. <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#redirection_messages" target="_blank" rel="noopener">Learn more on MDN</a>.'|t('redirects'),

@@ -15,6 +15,7 @@ class Install extends Migration
             'toUrl' => $this->string(500)->notNull(),
             'type' => $this->smallInteger()->notNull()->defaultValue(302),
             'matchType' => $this->string(10)->notNull()->defaultValue('exact'),
+            'priority' => $this->integer()->notNull()->defaultValue(0),
             'label' => $this->string(255)->null(),
             'notes' => $this->text(),
             'enabled' => $this->boolean()->notNull()->defaultValue(true),
