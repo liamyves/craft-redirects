@@ -16,6 +16,7 @@ class RedirectModel extends Model
     public ?string $label = null;
     public ?string $notes = null;
     public bool $enabled = true;
+    public ?\DateTime $expiryDate = null;
 
     public function getSiteName(): string
     {
@@ -64,13 +65,20 @@ class RedirectModel extends Model
         return [
             [['fromUrl', 'toUrl'], 'required'],
             [['fromUrl', 'toUrl'], 'string', 'max' => 500],
-            ['fromUrl', 'match', 'pattern' => '/^\//', 'message' => 'Must start with /'],
+            [
+                'fromUrl',
+                'match',
+                'pattern' => '#^(/|https?://)#i',
+                'message' => 'Must start with / or be a full URL (https://...)',
+                'when' => fn(self $model) => $model->matchType === 'exact',
+            ],
             ['type', 'in', 'range' => [301, 302, 307, 308]],
             ['matchType', 'in', 'range' => ['exact', 'regex']],
             ['label', 'string', 'max' => 255],
             ['notes', 'safe'],
             ['enabled', 'boolean'],
             ['siteId', 'safe'],
+            ['expiryDate', 'safe'],
         ];
     }
 }

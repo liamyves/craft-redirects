@@ -1,0 +1,25 @@
+{% import '_includes/forms' as forms %}
+
+{{ forms.lightswitchField({
+    label: 'Automatic redirects'|t('redirects'),
+    instructions: 'Automatically create a redirect when an element’s URI changes (e.g. when an entry slug is edited).'|t('redirects'),
+    id: 'autoCreateRedirects',
+    name: 'autoCreateRedirects',
+    on: settings.autoCreateRedirects,
+    errors: settings.getErrors('autoCreateRedirects'),
+}) }}
+
+{{ forms.selectField({
+    label: 'Automatic redirect type'|t('redirects'),
+    instructions: 'The HTTP status code used for automatically created redirects.'|t('redirects'),
+    id: 'autoRedirectType',
+    name: 'autoRedirectType',
+    value: settings.autoRedirectType,
+    options: {
+        301: '301 — Permanent (browser caches redirect)'|t('redirects'),
+        302: '302 — Temporary (browser does not cache)'|t('redirects'),
+        307: '307 — Temporary (preserve method, browser does not cache)'|t('redirects'),
+        308: '308 — Permanent (preserve method, browser caches redirect)'|t('redirects'),
+    },
+    errors: settings.getErrors('autoRedirectType'),
+}) }}

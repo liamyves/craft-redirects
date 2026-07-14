@@ -28,6 +28,7 @@
                                     <option value="siteId" {% if header|lower in ['site', 'siteid', 'site id', 'site handle'] %}selected{% endif %}>{{ 'Site'|t('redirects') }}</option>
                                     <option value="label" {% if header|lower in ['label', 'tag', 'category', 'categorie', 'reden', 'reason'] %}selected{% endif %}>{{ 'Label'|t('redirects') }}</option>
                                     <option value="notes" {% if header|lower in ['notes', 'note', 'comment', 'comments', 'description'] %}selected{% endif %}>{{ 'Notes'|t('redirects') }}</option>
+                                    <option value="expiryDate" {% if header|lower in ['expiry', 'expires', 'expiry date', 'expirydate', 'vervaldatum'] %}selected{% endif %}>{{ 'Expiry date'|t('redirects') }}</option>
                                 </select>
                             </div>
                         </th>

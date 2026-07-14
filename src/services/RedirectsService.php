@@ -4,6 +4,8 @@ namespace recranet\redirects\services;
 
 use Craft;
 use craft\base\Component;
+use craft\helpers\DateTimeHelper;
+use craft\helpers\Db;
 use recranet\redirects\models\RedirectModel;
 use recranet\redirects\records\RedirectRecord;
 use yii\db\Expression;
@@ -30,22 +32,43 @@ class RedirectsService extends Component
         return $record ? $this->recordToModel($record) : null;
     }
 
-    public function findRedirectByPath(string $path, ?int $siteId = null): ?RedirectModel
+    public function findRedirectByPath(string $path, ?int $siteId = null, ?string $hostInfo = null): ?RedirectModel
     {
+        // Accept a full URL as input (e.g. from the Test URL tool)
+        if (preg_match('#^(https?://[^/]+)(/.*)?$#i', $path, $matches)) {
+            $hostInfo = $matches[1];
+            $path = $matches[2] ?? '/';
+        }
+
         $path = '/' . ltrim($path, '/');
         $pathNoSlash = rtrim($path, '/');
         $pathWithSlash = $pathNoSlash . '/';
 
+        $candidates = [strtolower($pathNoSlash), strtolower($pathWithSlash)];
+
+        // Also match full URLs including the host (e.g. https://example.com/old-page)
+        if ($hostInfo) {
+            $host = strtolower(rtrim($hostInfo, '/'));
+            $candidates[] = $host . strtolower($pathNoSlash);
+            $candidates[] = $host . strtolower($pathWithSlash);
+        }
+
         $hasMatchType = $this->hasColumn('matchType');
         $hasSiteId = $this->hasColumn('siteId');
+        $hasExpiryDate = $this->hasColumn('expiryDate');
+        $notExpired = ['or', ['expiryDate' => null], ['>', 'expiryDate', Db::prepareDateForDb(new \DateTime())]];
 
         // Try exact match first
         $query = RedirectRecord::find()
-            ->where(['lower([[fromUrl]])' => [strtolower($pathNoSlash), strtolower($pathWithSlash)]])
+            ->where(['lower([[fromUrl]])' => $candidates])
             ->andWhere(['enabled' => true]);
 
         if ($hasMatchType) {
             $query->andWhere(['matchType' => 'exact']);
+        }
+
+        if ($hasExpiryDate) {
+            $query->andWhere($notExpired);
         }
 
         if ($hasSiteId && $siteId !== null) {
@@ -65,6 +88,10 @@ class RedirectsService extends Component
             $regexQuery = RedirectRecord::find()
                 ->where(['enabled' => true, 'matchType' => 'regex']);
 
+            if ($hasExpiryDate) {
+                $regexQuery->andWhere($notExpired);
+            }
+
             if ($hasSiteId && $siteId !== null) {
                 $regexQuery->andWhere(['or', ['siteId' => null], ['siteId' => $siteId]]);
                 // Site-specific first
@@ -73,13 +100,22 @@ class RedirectsService extends Component
 
             $regexRecords = $regexQuery->all();
 
+            // Match patterns against the path, and against the full URL when available
+            $subjects = [$path];
+            if ($hostInfo) {
+                $subjects[] = rtrim($hostInfo, '/') . $path;
+            }
+
             foreach ($regexRecords as $record) {
                 $pattern = '#' . $record->fromUrl . '#i';
-                if (@preg_match($pattern, $path, $matches)) {
-                    $model = $this->recordToModel($record);
-                    // Support $1, $2 etc. backreferences in toUrl
-                    $model->toUrl = @preg_replace($pattern, $model->toUrl, $path);
-                    return $model;
+
+                foreach ($subjects as $subject) {
+                    if (@preg_match($pattern, $subject, $matches)) {
+                        $model = $this->recordToModel($record);
+                        // Support $1, $2 etc. backreferences in toUrl
+                        $model->toUrl = @preg_replace($pattern, $model->toUrl, $subject);
+                        return $model;
+                    }
                 }
             }
         }
@@ -95,8 +131,13 @@ class RedirectsService extends Component
 
     public function saveRedirect(RedirectModel $model): bool
     {
-        // Normalize: ensure leading slash (only for exact matches)
-        if ($model->matchType === 'exact' && $model->fromUrl && !str_starts_with($model->fromUrl, '/')) {
+        // Normalize: ensure leading slash (only for exact matches, unless it's a full URL)
+        if (
+            $model->matchType === 'exact' &&
+            $model->fromUrl &&
+            !str_starts_with($model->fromUrl, '/') &&
+            !preg_match('#^https?://#i', $model->fromUrl)
+        ) {
             $model->fromUrl = '/' . $model->fromUrl;
         }
 
@@ -150,6 +191,7 @@ class RedirectsService extends Component
         $record->label = $model->label;
         $record->notes = $model->notes;
         $record->enabled = $model->enabled;
+        $record->expiryDate = Db::prepareDateForDb($model->expiryDate);
 
         if (!$record->save()) {
             $model->addErrors($record->getErrors());
@@ -166,7 +208,7 @@ class RedirectsService extends Component
      * Also removes redirects that would loop and re-points existing
      * redirects that targeted the old URI.
      */
-    public function createAutoRedirect(string $oldUri, string $newUri, int $siteId): void
+    public function createAutoRedirect(string $oldUri, string $newUri, int $siteId, int $type = 301): void
     {
         $fromUrl = '/' . ltrim($oldUri, '/');
         $toUrl = '/' . ltrim($newUri, '/');
@@ -213,7 +255,7 @@ class RedirectsService extends Component
             $record = new RedirectRecord();
             $record->siteId = $siteId;
             $record->fromUrl = $fromUrl;
-            $record->type = 301;
+            $record->type = $type;
             $record->matchType = 'exact';
             $record->notes = 'Automatically created after a URI change.';
         }
@@ -295,7 +337,7 @@ class RedirectsService extends Component
         $redirects = $this->getAllRedirects($siteId);
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'site', 'label', 'notes', 'enabled']);
+        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'site', 'label', 'notes', 'enabled', 'expiryDate']);
 
         foreach ($redirects as $redirect) {
             $siteHandle = '';
@@ -313,6 +355,7 @@ class RedirectsService extends Component
                 $redirect->label,
                 $redirect->notes,
                 $redirect->enabled ? 'yes' : 'no',
+                $redirect->expiryDate ? $redirect->expiryDate->format('Y-m-d H:i:s') : '',
             ]);
         }
 
@@ -336,6 +379,10 @@ class RedirectsService extends Component
             $model->matchType = $row['matchType'] ?? 'exact';
             $model->label = $row['label'] ?? null;
             $model->notes = $row['notes'] ?? null;
+
+            if (!empty($row['expiryDate'])) {
+                $model->expiryDate = DateTimeHelper::toDateTime($row['expiryDate']) ?: null;
+            }
 
             // Resolve siteId from row data or use default
             if (!empty($row['siteId'])) {
@@ -383,6 +430,7 @@ class RedirectsService extends Component
         $model->label = $record->label;
         $model->notes = $record->notes;
         $model->enabled = (bool)$record->enabled;
+        $model->expiryDate = $record->expiryDate ? DateTimeHelper::toDateTime($record->expiryDate) : null;
 
         return $model;
     }

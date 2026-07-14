@@ -5,15 +5,19 @@ namespace recranet\redirects;
 use Craft;
 use craft\base\Element;
 use craft\base\ElementInterface;
+use craft\base\Model;
 use craft\base\Plugin;
 use craft\db\Query;
 use craft\db\Table;
 use craft\events\ElementEvent;
 use craft\events\RegisterUrlRulesEvent;
+use craft\events\RegisterUserPermissionsEvent;
 use craft\helpers\ElementHelper;
 use craft\services\Elements;
+use craft\services\UserPermissions;
 use craft\web\Application;
 use craft\web\UrlManager;
+use recranet\redirects\models\Settings;
 use recranet\redirects\services\RedirectsService;
 use yii\base\Event;
 
@@ -22,8 +26,9 @@ use yii\base\Event;
  */
 class Redirects extends Plugin
 {
-    public string $schemaVersion = '2.0.0';
+    public string $schemaVersion = '2.1.0';
     public bool $hasCpSection = true;
+    public bool $hasCpSettings = true;
 
     /**
      * Old element URIs captured before save, keyed by "elementId-siteId".
@@ -46,6 +51,37 @@ class Redirects extends Plugin
         $this->registerCpRoutes();
         $this->registerRedirectInterception();
         $this->registerAutoRedirects();
+        $this->registerPermissions();
+    }
+
+    protected function createSettingsModel(): ?Model
+    {
+        return new Settings();
+    }
+
+    protected function settingsHtml(): ?string
+    {
+        return Craft::$app->getView()->renderTemplate('redirects/_settings', [
+            'settings' => $this->getSettings(),
+        ]);
+    }
+
+    private function registerPermissions(): void
+    {
+        Event::on(
+            UserPermissions::class,
+            UserPermissions::EVENT_REGISTER_PERMISSIONS,
+            function (RegisterUserPermissionsEvent $event) {
+                $event->permissions[] = [
+                    'heading' => Craft::t('redirects', 'Redirects'),
+                    'permissions' => [
+                        'redirects:manage' => [
+                            'label' => Craft::t('redirects', 'Manage redirects'),
+                        ],
+                    ],
+                ];
+            }
+        );
     }
 
     /**
@@ -81,7 +117,12 @@ class Redirects extends Plugin
 
     private function stashOldUri(ElementInterface $element): void
     {
-        if (!$element->id || !$element->siteId || ElementHelper::isDraftOrRevision($element)) {
+        if (
+            !$this->getSettings()->autoCreateRedirects ||
+            !$element->id ||
+            !$element->siteId ||
+            ElementHelper::isDraftOrRevision($element)
+        ) {
             return;
         }
 
@@ -117,7 +158,12 @@ class Redirects extends Plugin
         }
 
         try {
-            $this->redirectsService->createAutoRedirect($oldUri, $element->uri, (int)$element->siteId);
+            $this->redirectsService->createAutoRedirect(
+                $oldUri,
+                $element->uri,
+                (int)$element->siteId,
+                $this->getSettings()->autoRedirectType,
+            );
         } catch (\Throwable $e) {
             Craft::warning("Auto redirect creation failed: {$e->getMessage()}", __METHOD__);
         }
@@ -158,7 +204,7 @@ class Redirects extends Plugin
                 try {
                     $path = $request->getPathInfo();
                     $siteId = Craft::$app->getSites()->getCurrentSite()->id;
-                    $redirect = $this->redirectsService->findRedirectByPath($path, $siteId);
+                    $redirect = $this->redirectsService->findRedirectByPath($path, $siteId, $request->getHostInfo());
 
                     if ($redirect) {
                         Craft::$app->getResponse()->redirect($redirect->toUrl, $redirect->type);
@@ -173,6 +219,10 @@ class Redirects extends Plugin
 
     public function getCpNavItem(): ?array
     {
+        if (!Craft::$app->getUser()->checkPermission('redirects:manage')) {
+            return null;
+        }
+
         $item = parent::getCpNavItem();
         $item['label'] = Craft::t('redirects', 'Redirects');
         $item['subnav'] = [

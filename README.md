@@ -4,8 +4,11 @@ A redirect management plugin for Craft CMS 5. Manage URL redirects — all from 
 
 ## Features
 
-- **Automatic redirects on slug changes** — when an entry (or any element) gets a new URI, a 301 redirect from the old URI is created automatically
+- **Automatic redirects on slug changes** — when an entry (or any element) gets a new URI, a redirect from the old URI is created automatically (configurable in the plugin settings)
 - **Exact & regex redirects** with support for captured groups (`$1`, `$2`, etc.)
+- **Full-URL matching** — exact-match redirects can include the domain (`https://example.com/old-page`)
+- **Expiry dates** — optionally let a redirect expire automatically, e.g. for temporary campaigns
+- **Permissions** — access is controlled by the "Manage redirects" user permission
 - **301, 302, 307, 308** status codes
 - **Chain detection** — warns when a redirect points to another redirect's source URL
 - **Search & sort** — filter and sort redirects by any column
@@ -21,7 +24,7 @@ A redirect management plugin for Craft CMS 5. Manage URL redirects — all from 
 ## Installation
 
 ```bash
-composer require custom/craft-redirects
+composer require recranet/craft-redirects
 php craft plugin/install redirects
 ```
 
@@ -33,14 +36,15 @@ After installation, a **Redirects** item appears in the control panel sidebar wi
 
 Create and manage redirects. Each redirect has:
 
-| Field      | Description                                     |
-| ---------- | ----------------------------------------------- |
-| From URL   | The path to redirect from (must start with `/`) |
-| To URL     | The destination URL                             |
-| Type       | HTTP status code (301, 302, 307, 308)           |
-| Match Type | `exact` or `regex`                              |
-| Label      | Optional label for organization                 |
-| Notes      | Optional notes                                  |
+| Field       | Description                                                          |
+| ----------- | -------------------------------------------------------------------- |
+| From URL    | The path to redirect from (starts with `/`, or a full URL with domain) |
+| To URL      | The destination URL                                                  |
+| Type        | HTTP status code (301, 302, 307, 308)                                |
+| Match Type  | `exact` or `regex`                                                   |
+| Label       | Optional label for organization                                      |
+| Notes       | Optional notes                                                       |
+| Expiry date | Optional — after this date the redirect stops matching               |
 
 **Exact match** redirects are case-insensitive and normalize trailing slashes — `/old-page` and `/old-page/` are treated the same.
 
@@ -52,11 +56,17 @@ Create and manage redirects. Each redirect has:
 
 ### Automatic redirects
 
-When an element's URI changes — for example when you edit an entry's slug, or move a structure entry so its children get new URIs — the plugin automatically creates a **301 redirect** from the old URI to the new one, scoped to the element's site. It also:
+When an element's URI changes — for example when you edit an entry's slug, or move a structure entry so its children get new URIs — the plugin automatically creates a redirect from the old URI to the new one, scoped to the element's site. It also:
 
 - **Prevents loops** — removes existing redirects whose source matches the new URI
 - **Prevents chains** — re-points existing redirects that targeted the old URI directly to the new one
 - **Skips drafts and revisions** — only published saves create redirects
+
+This behavior can be disabled — and the status code changed (default 301) — in **Settings → Plugins → Redirects**.
+
+### Permissions
+
+Users need the **Manage redirects** permission (under the "Redirects" heading in user/group permissions) to see and use the plugin in the control panel.
 
 ### Import
 

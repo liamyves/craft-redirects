@@ -18,6 +18,7 @@ class Install extends Migration
             'label' => $this->string(255)->null(),
             'notes' => $this->text(),
             'enabled' => $this->boolean()->notNull()->defaultValue(true),
+            'expiryDate' => $this->dateTime()->null(),
             'dateCreated' => $this->dateTime()->notNull(),
             'dateUpdated' => $this->dateTime()->notNull(),
             'uid' => $this->uid(),

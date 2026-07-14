@@ -78,6 +78,7 @@
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 6 : 5 }}">{{ 'Match'|t('redirects') }}</th>
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 7 : 6 }}">{{ 'Label'|t('redirects') }}</th>
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 8 : 7 }}">{{ 'Notes'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 9 : 8 }}">{{ 'Expires'|t('redirects') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -101,6 +102,9 @@
                         <td>{{ redirect.matchType }}</td>
                         <td>{{ redirect.label ?? '' }}</td>
                         <td>{{ redirect.notes }}</td>
+                        <td{% if redirect.expiryDate and redirect.expiryDate < now %} style="color: #dc2626;"{% endif %}>
+                            {{ redirect.expiryDate ? redirect.expiryDate|date('short') : '' }}
+                        </td>
                         <td class="thin">
                             <a href="{{ cpUrl('redirects/' ~ redirect.id) }}" class="btn small" title="{{ 'Edit'|t('redirects') }}">{{ 'Edit'|t('redirects') }}</a>
                             <button class="btn small delete-redirect" data-id="{{ redirect.id }}" title="{{ 'Delete'|t('redirects') }}">{{ 'Delete'|t('redirects') }}</button>

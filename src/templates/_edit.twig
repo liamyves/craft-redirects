@@ -45,7 +45,7 @@
         label: 'From URL'|t('redirects'),
         instructions: redirect.matchType == 'regex'
             ? 'Regex pattern without delimiters, e.g. <code>^/blog/(.*)$</code>'|t('redirects')
-            : 'The path to redirect from. Must start with <code>/</code>.'|t('redirects'),
+            : 'The path to redirect from. Must start with <code>/</code>, or be a full URL including the domain (e.g. <code>https://example.com/old-page</code>).'|t('redirects'),
         id: 'fromUrl',
         name: 'fromUrl',
         value: redirect.fromUrl,
@@ -85,6 +85,15 @@
         value: redirect.label,
         errors: redirect.getErrors('label'),
         placeholder: 'e.g. Livegang',
+    }) }}
+
+    {{ forms.dateTimeField({
+        label: 'Expiry date'|t('redirects'),
+        instructions: 'Optional. After this date the redirect stops matching. Useful for temporary campaigns.'|t('redirects'),
+        id: 'expiryDate',
+        name: 'expiryDate',
+        value: redirect.expiryDate,
+        errors: redirect.getErrors('expiryDate'),
     }) }}
 
     {{ forms.textareaField({
