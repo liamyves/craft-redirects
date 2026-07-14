@@ -161,6 +161,68 @@ class RedirectsService extends Component
         return true;
     }
 
+    /**
+     * Create (or update) a 301 redirect after an element's URI changed.
+     * Also removes redirects that would loop and re-points existing
+     * redirects that targeted the old URI.
+     */
+    public function createAutoRedirect(string $oldUri, string $newUri, int $siteId): void
+    {
+        $fromUrl = '/' . ltrim($oldUri, '/');
+        $toUrl = '/' . ltrim($newUri, '/');
+
+        $fromNormalized = strtolower(rtrim($fromUrl, '/'));
+        $toNormalized = strtolower(rtrim($toUrl, '/'));
+
+        if ($fromNormalized === $toNormalized) {
+            return;
+        }
+
+        $siteCondition = ['or', ['siteId' => null], ['siteId' => $siteId]];
+
+        // Remove redirects that would shadow the new URI (and cause loops),
+        // e.g. when an element moves back to a previously used slug
+        $loopRecords = RedirectRecord::find()
+            ->where(['lower(TRIM(TRAILING \'/\' FROM [[fromUrl]]))' => $toNormalized])
+            ->andWhere(['matchType' => 'exact'])
+            ->andWhere($siteCondition)
+            ->all();
+
+        foreach ($loopRecords as $record) {
+            $record->delete();
+        }
+
+        // Re-point existing redirects that targeted the old URI, so no chains form
+        $chainRecords = RedirectRecord::find()
+            ->where(['lower(TRIM(TRAILING \'/\' FROM [[toUrl]]))' => $fromNormalized])
+            ->andWhere($siteCondition)
+            ->all();
+
+        foreach ($chainRecords as $record) {
+            $record->toUrl = $toUrl;
+            $record->save();
+        }
+
+        // Upsert the redirect itself
+        $record = RedirectRecord::find()
+            ->where(['lower(TRIM(TRAILING \'/\' FROM [[fromUrl]]))' => $fromNormalized])
+            ->andWhere(['matchType' => 'exact', 'siteId' => $siteId])
+            ->one();
+
+        if (!$record) {
+            $record = new RedirectRecord();
+            $record->siteId = $siteId;
+            $record->fromUrl = $fromUrl;
+            $record->type = 301;
+            $record->matchType = 'exact';
+            $record->notes = 'Automatically created after a URI change.';
+        }
+
+        $record->toUrl = $toUrl;
+        $record->enabled = true;
+        $record->save();
+    }
+
     public function deleteRedirectById(int $id): bool
     {
         $record = RedirectRecord::findOne($id);

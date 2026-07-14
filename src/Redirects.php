@@ -3,8 +3,15 @@
 namespace recranet\redirects;
 
 use Craft;
+use craft\base\Element;
+use craft\base\ElementInterface;
 use craft\base\Plugin;
+use craft\db\Query;
+use craft\db\Table;
+use craft\events\ElementEvent;
 use craft\events\RegisterUrlRulesEvent;
+use craft\helpers\ElementHelper;
+use craft\services\Elements;
 use craft\web\Application;
 use craft\web\UrlManager;
 use recranet\redirects\services\RedirectsService;
@@ -17,6 +24,11 @@ class Redirects extends Plugin
 {
     public string $schemaVersion = '2.0.0';
     public bool $hasCpSection = true;
+
+    /**
+     * Old element URIs captured before save, keyed by "elementId-siteId".
+     */
+    private array $oldElementUris = [];
 
     public static function config(): array
     {
@@ -33,6 +45,82 @@ class Redirects extends Plugin
 
         $this->registerCpRoutes();
         $this->registerRedirectInterception();
+        $this->registerAutoRedirects();
+    }
+
+    /**
+     * Automatically create a redirect when an element's URI changes
+     * (e.g. when an entry slug is edited).
+     */
+    private function registerAutoRedirects(): void
+    {
+        // Regular element saves
+        Event::on(
+            Elements::class,
+            Elements::EVENT_BEFORE_SAVE_ELEMENT,
+            fn(ElementEvent $event) => $this->stashOldUri($event->element)
+        );
+        Event::on(
+            Elements::class,
+            Elements::EVENT_AFTER_SAVE_ELEMENT,
+            fn(ElementEvent $event) => $this->handleUriChange($event->element)
+        );
+
+        // Slug/URI updates propagated to descendants (e.g. children of a moved/renamed structure entry)
+        Event::on(
+            Elements::class,
+            Elements::EVENT_BEFORE_UPDATE_SLUG_AND_URI,
+            fn(ElementEvent $event) => $this->stashOldUri($event->element)
+        );
+        Event::on(
+            Elements::class,
+            Elements::EVENT_AFTER_UPDATE_SLUG_AND_URI,
+            fn(ElementEvent $event) => $this->handleUriChange($event->element)
+        );
+    }
+
+    private function stashOldUri(ElementInterface $element): void
+    {
+        if (!$element->id || !$element->siteId || ElementHelper::isDraftOrRevision($element)) {
+            return;
+        }
+
+        $oldUri = (new Query())
+            ->select(['uri'])
+            ->from(Table::ELEMENTS_SITES)
+            ->where(['elementId' => $element->id, 'siteId' => $element->siteId])
+            ->scalar();
+
+        if ($oldUri) {
+            $this->oldElementUris[$element->id . '-' . $element->siteId] = $oldUri;
+        }
+    }
+
+    private function handleUriChange(ElementInterface $element): void
+    {
+        if (!$element->id || !$element->siteId || ElementHelper::isDraftOrRevision($element)) {
+            return;
+        }
+
+        $key = $element->id . '-' . $element->siteId;
+        $oldUri = $this->oldElementUris[$key] ?? null;
+        unset($this->oldElementUris[$key]);
+
+        if (
+            $oldUri === null ||
+            $element->uri === null ||
+            $oldUri === $element->uri ||
+            $oldUri === Element::HOMEPAGE_URI ||
+            $element->uri === Element::HOMEPAGE_URI
+        ) {
+            return;
+        }
+
+        try {
+            $this->redirectsService->createAutoRedirect($oldUri, $element->uri, (int)$element->siteId);
+        } catch (\Throwable $e) {
+            Craft::warning("Auto redirect creation failed: {$e->getMessage()}", __METHOD__);
+        }
     }
 
     private function registerCpRoutes(): void

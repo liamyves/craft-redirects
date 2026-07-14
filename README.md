@@ -4,6 +4,7 @@ A redirect management plugin for Craft CMS 5. Manage URL redirects — all from 
 
 ## Features
 
+- **Automatic redirects on slug changes** — when an entry (or any element) gets a new URI, a 301 redirect from the old URI is created automatically
 - **Exact & regex redirects** with support for captured groups (`$1`, `$2`, etc.)
 - **301, 302, 307, 308** status codes
 - **Chain detection** — warns when a redirect points to another redirect's source URL
@@ -48,6 +49,14 @@ Create and manage redirects. Each redirect has:
 | From URL             | To URL            | Example                                          |
 | -------------------- | ----------------- | ------------------------------------------------ |
 | `/blog/(\d{4})/(.*)` | `/articles/$1/$2` | `/blog/2024/my-post` -> `/articles/2024/my-post` |
+
+### Automatic redirects
+
+When an element's URI changes — for example when you edit an entry's slug, or move a structure entry so its children get new URIs — the plugin automatically creates a **301 redirect** from the old URI to the new one, scoped to the element's site. It also:
+
+- **Prevents loops** — removes existing redirects whose source matches the new URI
+- **Prevents chains** — re-points existing redirects that targeted the old URI directly to the new one
+- **Skips drafts and revisions** — only published saves create redirects
 
 ### Import
 
