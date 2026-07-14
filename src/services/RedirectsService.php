@@ -4,14 +4,18 @@ namespace recranet\redirects\services;
 
 use Craft;
 use craft\base\Component;
+use craft\db\Query;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
+use recranet\redirects\helpers\RedirectMatcher;
 use recranet\redirects\models\RedirectModel;
 use recranet\redirects\records\RedirectRecord;
-use yii\db\Expression;
 
 class RedirectsService extends Component
 {
+    private const CACHE_KEY = 'redirects:enabled-rows';
+    private const CACHE_DURATION = 3600;
+
     public function getAllRedirects(?int $siteId = null): array
     {
         $query = RedirectRecord::find()->orderBy(['id' => SORT_DESC]);
@@ -34,99 +38,27 @@ class RedirectsService extends Component
 
     public function findRedirectByPath(string $path, ?int $siteId = null, ?string $hostInfo = null): ?RedirectModel
     {
-        // Accept a full URL as input (e.g. from the Test URL tool)
-        if (preg_match('#^(https?://[^/]+)(/.*)?$#i', $path, $matches)) {
-            $hostInfo = $matches[1];
-            $path = $matches[2] ?? '/';
-        }
+        $row = RedirectMatcher::match($this->getEnabledRedirectRows(), $path, $siteId, $hostInfo);
 
-        $path = '/' . ltrim($path, '/');
-        $pathNoSlash = rtrim($path, '/');
-        $pathWithSlash = $pathNoSlash . '/';
-
-        $candidates = [strtolower($pathNoSlash), strtolower($pathWithSlash)];
-
-        // Also match full URLs including the host (e.g. https://example.com/old-page)
-        if ($hostInfo) {
-            $host = strtolower(rtrim($hostInfo, '/'));
-            $candidates[] = $host . strtolower($pathNoSlash);
-            $candidates[] = $host . strtolower($pathWithSlash);
-        }
-
-        $hasMatchType = $this->hasColumn('matchType');
-        $hasSiteId = $this->hasColumn('siteId');
-        $hasExpiryDate = $this->hasColumn('expiryDate');
-        $notExpired = ['or', ['expiryDate' => null], ['>', 'expiryDate', Db::prepareDateForDb(new \DateTime())]];
-
-        // Try exact match first
-        $query = RedirectRecord::find()
-            ->where(['lower([[fromUrl]])' => $candidates])
-            ->andWhere(['enabled' => true]);
-
-        if ($hasMatchType) {
-            $query->andWhere(['matchType' => 'exact']);
-        }
-
-        if ($hasExpiryDate) {
-            $query->andWhere($notExpired);
-        }
-
-        if ($hasSiteId && $siteId !== null) {
-            $query->andWhere(['or', ['siteId' => null], ['siteId' => $siteId]]);
-            // Site-specific wins over global: ORDER BY siteId DESC NULLS LAST
-            $query->orderBy(new Expression('CASE WHEN [[siteId]] IS NULL THEN 1 ELSE 0 END ASC'));
-        }
-
-        $record = $query->one();
-
-        if ($record) {
-            return $this->recordToModel($record);
-        }
-
-        // Try regex matches (only if matchType column exists)
-        if ($hasMatchType) {
-            $regexQuery = RedirectRecord::find()
-                ->where(['enabled' => true, 'matchType' => 'regex']);
-
-            if ($hasExpiryDate) {
-                $regexQuery->andWhere($notExpired);
-            }
-
-            if ($hasSiteId && $siteId !== null) {
-                $regexQuery->andWhere(['or', ['siteId' => null], ['siteId' => $siteId]]);
-                // Site-specific first
-                $regexQuery->orderBy(new Expression('CASE WHEN [[siteId]] IS NULL THEN 1 ELSE 0 END ASC'));
-            }
-
-            $regexRecords = $regexQuery->all();
-
-            // Match patterns against the path, and against the full URL when available
-            $subjects = [$path];
-            if ($hostInfo) {
-                $subjects[] = rtrim($hostInfo, '/') . $path;
-            }
-
-            foreach ($regexRecords as $record) {
-                $pattern = '#' . $record->fromUrl . '#i';
-
-                foreach ($subjects as $subject) {
-                    if (@preg_match($pattern, $subject, $matches)) {
-                        $model = $this->recordToModel($record);
-                        // Support $1, $2 etc. backreferences in toUrl
-                        $model->toUrl = @preg_replace($pattern, $model->toUrl, $subject);
-                        return $model;
-                    }
-                }
-            }
-        }
-
-        return null;
+        return $row ? $this->rowToModel($row) : null;
     }
 
-    private function hasColumn(string $column): bool
+    /**
+     * All enabled redirect rows, cached so front-end requests skip the database.
+     */
+    private function getEnabledRedirectRows(): array
     {
-        $schema = Craft::$app->getDb()->getTableSchema('{{%redirects}}');
-        return $schema && $schema->getColumn($column) !== null;
+        return Craft::$app->getCache()->getOrSet(self::CACHE_KEY, function() {
+            return (new Query())
+                ->from(RedirectRecord::tableName())
+                ->where(['enabled' => true])
+                ->all();
+        }, self::CACHE_DURATION);
+    }
+
+    public function invalidateCache(): void
+    {
+        Craft::$app->getCache()->delete(self::CACHE_KEY);
     }
 
     public function saveRedirect(RedirectModel $model): bool
@@ -199,6 +131,7 @@ class RedirectsService extends Component
         }
 
         $model->id = $record->id;
+        $this->invalidateCache();
 
         return true;
     }
@@ -263,13 +196,20 @@ class RedirectsService extends Component
         $record->toUrl = $toUrl;
         $record->enabled = true;
         $record->save();
+
+        $this->invalidateCache();
     }
 
     public function deleteRedirectById(int $id): bool
     {
         $record = RedirectRecord::findOne($id);
+        $deleted = $record ? (bool)$record->delete() : false;
 
-        return $record ? (bool)$record->delete() : false;
+        if ($deleted) {
+            $this->invalidateCache();
+        }
+
+        return $deleted;
     }
 
     /**
@@ -306,9 +246,13 @@ class RedirectsService extends Component
      */
     public function bulkSetEnabled(array $ids, bool $enabled): int
     {
-        return Craft::$app->getDb()->createCommand()
+        $count = Craft::$app->getDb()->createCommand()
             ->update('{{%redirects}}', ['enabled' => $enabled], ['id' => $ids])
             ->execute();
+
+        $this->invalidateCache();
+
+        return $count;
     }
 
     /**
@@ -316,9 +260,13 @@ class RedirectsService extends Component
      */
     public function bulkSetType(array $ids, int $type): int
     {
-        return Craft::$app->getDb()->createCommand()
+        $count = Craft::$app->getDb()->createCommand()
             ->update('{{%redirects}}', ['type' => $type], ['id' => $ids])
             ->execute();
+
+        $this->invalidateCache();
+
+        return $count;
     }
 
     /**
@@ -326,7 +274,11 @@ class RedirectsService extends Component
      */
     public function bulkDelete(array $ids): int
     {
-        return RedirectRecord::deleteAll(['id' => $ids]);
+        $count = RedirectRecord::deleteAll(['id' => $ids]);
+
+        $this->invalidateCache();
+
+        return $count;
     }
 
     /**
@@ -416,6 +368,23 @@ class RedirectsService extends Component
             'total' => count($rows),
             'errors' => $errors,
         ];
+    }
+
+    private function rowToModel(array $row): RedirectModel
+    {
+        $model = new RedirectModel();
+        $model->id = (int)$row['id'];
+        $model->siteId = isset($row['siteId']) && $row['siteId'] !== null ? (int)$row['siteId'] : null;
+        $model->fromUrl = $row['fromUrl'];
+        $model->toUrl = $row['toUrl'];
+        $model->type = (int)$row['type'];
+        $model->matchType = $row['matchType'] ?? 'exact';
+        $model->label = $row['label'] ?? null;
+        $model->notes = $row['notes'] ?? null;
+        $model->enabled = (bool)$row['enabled'];
+        $model->expiryDate = !empty($row['expiryDate']) ? DateTimeHelper::toDateTime($row['expiryDate']) : null;
+
+        return $model;
     }
 
     private function recordToModel(RedirectRecord $record): RedirectModel

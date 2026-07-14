@@ -17,6 +17,7 @@ use craft\services\Elements;
 use craft\services\UserPermissions;
 use craft\web\Application;
 use craft\web\UrlManager;
+use recranet\redirects\helpers\RedirectMatcher;
 use recranet\redirects\models\Settings;
 use recranet\redirects\services\RedirectsService;
 use yii\base\Event;
@@ -207,13 +208,11 @@ class Redirects extends Plugin
                     $redirect = $this->redirectsService->findRedirectByPath($path, $siteId, $request->getHostInfo());
 
                     if ($redirect) {
-                        $toUrl = $redirect->toUrl;
-
                         // Preserve the incoming query string (e.g. utm parameters)
-                        $queryString = $request->getQueryStringWithoutPath();
-                        if ($queryString) {
-                            $toUrl .= (str_contains($toUrl, '?') ? '&' : '?') . $queryString;
-                        }
+                        $toUrl = RedirectMatcher::appendQueryString(
+                            $redirect->toUrl,
+                            $request->getQueryStringWithoutPath(),
+                        );
 
                         Craft::$app->getResponse()->redirect($toUrl, $redirect->type);
                         Craft::$app->end();

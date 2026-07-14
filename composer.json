@@ -6,9 +6,26 @@
 	"require": {
 		"craftcms/cms": "^5.0"
 	},
+	"require-dev": {
+		"phpunit/phpunit": "^10.5"
+	},
 	"autoload": {
 		"psr-4": {
 			"recranet\\redirects\\": "src/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"recranet\\redirects\\tests\\": "tests/"
+		}
+	},
+	"scripts": {
+		"test": "phpunit"
+	},
+	"config": {
+		"allow-plugins": {
+			"yiisoft/yii2-composer": true,
+			"craftcms/plugin-installer": true
 		}
 	},
 	"extra": {
