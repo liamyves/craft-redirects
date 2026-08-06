@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 16h8V10H8l6-6 6 6h-4v10H4z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+	<!-- Monochrome mask for the CP sidebar (Craft colors it via CSS): an
+	     incoming path branching off into a redirect arrow -->
+	<g transform="translate(20 -8)">
+		<g fill="none" stroke="currentColor" stroke-width="48" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M80 408h128c66.3 0 120-53.7 120-120v-64"/>
+		</g>
+		<path fill="currentColor" d="m328 96 84 120H244z"/>
+	</g>
+</svg>
