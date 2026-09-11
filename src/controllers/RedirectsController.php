@@ -3,6 +3,7 @@
 namespace recranet\redirects\controllers;
 
 use Craft;
+use craft\helpers\DateTimeHelper;
 use craft\web\Controller;
 use craft\web\UploadedFile;
 use recranet\redirects\models\RedirectModel;
@@ -11,6 +12,17 @@ use yii\web\Response;
 
 class RedirectsController extends Controller
 {
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        $this->requirePermission('redirects:manage');
+
+        return true;
+    }
+
     public function actionIndex(): Response
     {
         $siteId = Craft::$app->getRequest()->getQueryParam('siteId');
@@ -71,9 +83,11 @@ class RedirectsController extends Controller
         $model->toUrl = $request->getBodyParam('toUrl');
         $model->type = (int)$request->getBodyParam('type', 301);
         $model->matchType = $request->getBodyParam('matchType', 'exact');
+        $model->priority = (int)$request->getBodyParam('priority', 0);
         $model->label = $request->getBodyParam('label');
         $model->notes = $request->getBodyParam('notes');
         $model->enabled = (bool)$request->getBodyParam('enabled', true);
+        $model->expiryDate = DateTimeHelper::toDateTime($request->getBodyParam('expiryDate')) ?: null;
 
         $service = Redirects::getInstance()->redirectsService;
 

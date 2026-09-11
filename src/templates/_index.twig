@@ -10,6 +10,29 @@
 {% endblock %}
 
 {% block content %}
+    {# How it works #}
+    {% set pluginSettings = craft.app.plugins.getPlugin('redirects').settings %}
+    <details class="redirects-help" style="margin-bottom: 24px; padding: 14px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;">
+        <summary style="cursor: pointer; font-weight: 600;">{{ 'How do redirects work?'|t('redirects') }}</summary>
+        <div style="margin-top: 12px;">
+            <p>{{ 'Visitors requesting a URL that matches a "From" path are automatically forwarded to the "To" URL, using the HTTP status code in the "Type" column. Query strings (e.g. <code>?utm_source=...</code>) are preserved.'|t('redirects')|raw }}</p>
+
+            <h4 style="margin: 14px 0 4px;">{{ 'Automatic redirects'|t('redirects') }}</h4>
+            {% if pluginSettings.autoCreateRedirects %}
+                <p>{{ 'When the URL of an entry changes (for example after editing a slug or moving it in a structure), a {type} redirect from the old URL to the new one is created automatically — including for any child pages. These entries are recognizable by the note “Automatically created after a URI change.” You don’t need to do anything yourself.'|t('redirects', { type: pluginSettings.autoRedirectType }) }}</p>
+                <p>{{ 'The plugin also keeps things tidy: existing redirects pointing to the old URL are re-pointed to the new one (no chains), and redirects that would cause a loop are removed.'|t('redirects') }}</p>
+                <p><em>{{ 'Note: deleting a page does not create a redirect — there is no new URL to point to. Add one manually if needed.'|t('redirects') }}</em></p>
+            {% else %}
+                <p>{{ 'Automatic redirect creation is currently disabled in the plugin settings.'|t('redirects') }}</p>
+            {% endif %}
+
+            <h4 style="margin: 14px 0 4px;">{{ 'Matching'|t('redirects') }}</h4>
+            <p>{{ '<strong>Exact</strong> redirects match the path literally (trailing slashes and letter case are ignored). <strong>Regex</strong> redirects use a pattern; lower "Priority" values are checked first. Redirects with an "Expires" date stop working after that date.'|t('redirects')|raw }}</p>
+
+            <p>{{ 'Use the "Test URL" tool below to check which redirect (if any) applies to a given path.'|t('redirects') }}</p>
+        </div>
+    </details>
+
     {# Site filter #}
     {% if sites|length > 1 %}
         <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
@@ -77,8 +100,10 @@
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 4 : 3 }}">{{ 'To'|t('redirects') }}</th>
                     <th class="sortable" data-sort="number" data-index="{{ sites|length > 1 ? 5 : 4 }}">{{ 'Type'|t('redirects') }}</th>
                     <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 6 : 5 }}">{{ 'Match'|t('redirects') }}</th>
-                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 7 : 6 }}">{{ 'Label'|t('redirects') }}</th>
-                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 8 : 7 }}">{{ 'Notes'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="number" data-index="{{ sites|length > 1 ? 7 : 6 }}">{{ 'Priority'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 8 : 7 }}">{{ 'Label'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 9 : 8 }}">{{ 'Notes'|t('redirects') }}</th>
+                    <th class="sortable" data-sort="string" data-index="{{ sites|length > 1 ? 10 : 9 }}">{{ 'Expires'|t('redirects') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -100,8 +125,12 @@
                         <td>{{ redirect.toUrl }}</td>
                         <td>{{ redirect.type }}</td>
                         <td>{{ redirect.matchType }}</td>
+                        <td>{{ redirect.priority }}</td>
                         <td>{{ redirect.label ?? '' }}</td>
                         <td>{{ redirect.notes }}</td>
+                        <td{% if redirect.expiryDate and redirect.expiryDate < now %} style="color: #dc2626;"{% endif %}>
+                            {{ redirect.expiryDate ? redirect.expiryDate|date('short') : '' }}
+                        </td>
                         <td class="thin">
                             <a href="{{ cpUrl('redirects/' ~ redirect.id) }}" class="btn small" title="{{ 'Edit'|t('redirects') }}">{{ 'Edit'|t('redirects') }}</a>
                             <button class="btn small delete-redirect" data-id="{{ redirect.id }}" title="{{ 'Delete'|t('redirects') }}">{{ 'Delete'|t('redirects') }}</button>

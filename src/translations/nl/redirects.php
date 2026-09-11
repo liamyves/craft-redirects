@@ -116,4 +116,16 @@ return [
 
     // Empty states
     'No redirects yet.' => 'Nog geen redirects.',
+
+    // How it works
+    'How do redirects work?' => 'Hoe werken redirects?',
+    'Visitors requesting a URL that matches a "From" path are automatically forwarded to the "To" URL, using the HTTP status code in the "Type" column. Query strings (e.g. <code>?utm_source=...</code>) are preserved.' => 'Bezoekers die een URL opvragen die overeenkomt met een "Van"-pad worden automatisch doorgestuurd naar de "Naar"-URL, met de HTTP-statuscode uit de kolom "Type". Query strings (bijv. <code>?utm_source=...</code>) blijven behouden.',
+    'Automatic redirects' => 'Automatische redirects',
+    'When the URL of an entry changes (for example after editing a slug or moving it in a structure), a {type} redirect from the old URL to the new one is created automatically — including for any child pages. These entries are recognizable by the note “Automatically created after a URI change.” You don’t need to do anything yourself.' => 'Wanneer de URL van een pagina verandert (bijvoorbeeld na het aanpassen van een slug of het verplaatsen in een structuur), wordt automatisch een {type}-redirect aangemaakt van de oude naar de nieuwe URL — ook voor eventuele onderliggende pagina\'s. Deze zijn te herkennen aan de notitie "Automatically created after a URI change." Je hoeft hier zelf niets voor te doen.',
+    'The plugin also keeps things tidy: existing redirects pointing to the old URL are re-pointed to the new one (no chains), and redirects that would cause a loop are removed.' => 'De plugin houdt het ook netjes: bestaande redirects die naar de oude URL wezen worden omgezet naar de nieuwe (geen kettingen), en redirects die een loop zouden veroorzaken worden verwijderd.',
+    'Note: deleting a page does not create a redirect — there is no new URL to point to. Add one manually if needed.' => 'Let op: bij het verwijderen van een pagina wordt géén redirect aangemaakt — er is dan geen nieuwe URL om naartoe te verwijzen. Voeg er zo nodig handmatig één toe.',
+    'Automatic redirect creation is currently disabled in the plugin settings.' => 'Het automatisch aanmaken van redirects staat momenteel uitgeschakeld in de plugininstellingen.',
+    'Matching' => 'Matching',
+    '<strong>Exact</strong> redirects match the path literally (trailing slashes and letter case are ignored). <strong>Regex</strong> redirects use a pattern; lower "Priority" values are checked first. Redirects with an "Expires" date stop working after that date.' => '<strong>Exacte</strong> redirects komen letterlijk overeen met het pad (slashes aan het einde en hoofdletters worden genegeerd). <strong>Regex</strong>-redirects gebruiken een patroon; lagere "Prioriteit"-waarden worden eerst gecontroleerd. Redirects met een "Verloopt"-datum werken na die datum niet meer.',
+    'Use the "Test URL" tool below to check which redirect (if any) applies to a given path.' => 'Gebruik de tool "URL testen" hieronder om te controleren welke redirect (indien aanwezig) van toepassing is op een pad.',
 ];

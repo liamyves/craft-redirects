@@ -4,12 +4,18 @@ namespace recranet\redirects\services;
 
 use Craft;
 use craft\base\Component;
+use craft\db\Query;
+use craft\helpers\DateTimeHelper;
+use craft\helpers\Db;
+use recranet\redirects\helpers\RedirectMatcher;
 use recranet\redirects\models\RedirectModel;
 use recranet\redirects\records\RedirectRecord;
-use yii\db\Expression;
 
 class RedirectsService extends Component
 {
+    private const CACHE_KEY = 'redirects:enabled-rows';
+    private const CACHE_DURATION = 3600;
+
     public function getAllRedirects(?int $siteId = null): array
     {
         $query = RedirectRecord::find()->orderBy(['id' => SORT_DESC]);
@@ -30,73 +36,40 @@ class RedirectsService extends Component
         return $record ? $this->recordToModel($record) : null;
     }
 
-    public function findRedirectByPath(string $path, ?int $siteId = null): ?RedirectModel
+    public function findRedirectByPath(string $path, ?int $siteId = null, ?string $hostInfo = null): ?RedirectModel
     {
-        $path = '/' . ltrim($path, '/');
-        $pathNoSlash = rtrim($path, '/');
-        $pathWithSlash = $pathNoSlash . '/';
+        $row = RedirectMatcher::match($this->getEnabledRedirectRows(), $path, $siteId, $hostInfo);
 
-        $hasMatchType = $this->hasColumn('matchType');
-        $hasSiteId = $this->hasColumn('siteId');
-
-        // Try exact match first
-        $query = RedirectRecord::find()
-            ->where(['lower([[fromUrl]])' => [strtolower($pathNoSlash), strtolower($pathWithSlash)]])
-            ->andWhere(['enabled' => true]);
-
-        if ($hasMatchType) {
-            $query->andWhere(['matchType' => 'exact']);
-        }
-
-        if ($hasSiteId && $siteId !== null) {
-            $query->andWhere(['or', ['siteId' => null], ['siteId' => $siteId]]);
-            // Site-specific wins over global: ORDER BY siteId DESC NULLS LAST
-            $query->orderBy(new Expression('CASE WHEN [[siteId]] IS NULL THEN 1 ELSE 0 END ASC'));
-        }
-
-        $record = $query->one();
-
-        if ($record) {
-            return $this->recordToModel($record);
-        }
-
-        // Try regex matches (only if matchType column exists)
-        if ($hasMatchType) {
-            $regexQuery = RedirectRecord::find()
-                ->where(['enabled' => true, 'matchType' => 'regex']);
-
-            if ($hasSiteId && $siteId !== null) {
-                $regexQuery->andWhere(['or', ['siteId' => null], ['siteId' => $siteId]]);
-                // Site-specific first
-                $regexQuery->orderBy(new Expression('CASE WHEN [[siteId]] IS NULL THEN 1 ELSE 0 END ASC'));
-            }
-
-            $regexRecords = $regexQuery->all();
-
-            foreach ($regexRecords as $record) {
-                $pattern = '#' . $record->fromUrl . '#i';
-                if (@preg_match($pattern, $path, $matches)) {
-                    $model = $this->recordToModel($record);
-                    // Support $1, $2 etc. backreferences in toUrl
-                    $model->toUrl = @preg_replace($pattern, $model->toUrl, $path);
-                    return $model;
-                }
-            }
-        }
-
-        return null;
+        return $row ? $this->rowToModel($row) : null;
     }
 
-    private function hasColumn(string $column): bool
+    /**
+     * All enabled redirect rows, cached so front-end requests skip the database.
+     */
+    private function getEnabledRedirectRows(): array
     {
-        $schema = Craft::$app->getDb()->getTableSchema('{{%redirects}}');
-        return $schema && $schema->getColumn($column) !== null;
+        return Craft::$app->getCache()->getOrSet(self::CACHE_KEY, function() {
+            return (new Query())
+                ->from(RedirectRecord::tableName())
+                ->where(['enabled' => true])
+                ->all();
+        }, self::CACHE_DURATION);
+    }
+
+    public function invalidateCache(): void
+    {
+        Craft::$app->getCache()->delete(self::CACHE_KEY);
     }
 
     public function saveRedirect(RedirectModel $model): bool
     {
-        // Normalize: ensure leading slash (only for exact matches)
-        if ($model->matchType === 'exact' && $model->fromUrl && !str_starts_with($model->fromUrl, '/')) {
+        // Normalize: ensure leading slash (only for exact matches, unless it's a full URL)
+        if (
+            $model->matchType === 'exact' &&
+            $model->fromUrl &&
+            !str_starts_with($model->fromUrl, '/') &&
+            !preg_match('#^https?://#i', $model->fromUrl)
+        ) {
             $model->fromUrl = '/' . $model->fromUrl;
         }
 
@@ -147,9 +120,11 @@ class RedirectsService extends Component
         $record->toUrl = $model->toUrl;
         $record->type = $model->type;
         $record->matchType = $model->matchType;
+        $record->priority = $model->priority;
         $record->label = $model->label;
         $record->notes = $model->notes;
         $record->enabled = $model->enabled;
+        $record->expiryDate = Db::prepareDateForDb($model->expiryDate);
 
         if (!$record->save()) {
             $model->addErrors($record->getErrors());
@@ -157,15 +132,85 @@ class RedirectsService extends Component
         }
 
         $model->id = $record->id;
+        $this->invalidateCache();
 
         return true;
+    }
+
+    /**
+     * Create (or update) a 301 redirect after an element's URI changed.
+     * Also removes redirects that would loop and re-points existing
+     * redirects that targeted the old URI.
+     */
+    public function createAutoRedirect(string $oldUri, string $newUri, int $siteId, int $type = 301): void
+    {
+        $fromUrl = '/' . ltrim($oldUri, '/');
+        $toUrl = '/' . ltrim($newUri, '/');
+
+        $fromNormalized = strtolower(rtrim($fromUrl, '/'));
+        $toNormalized = strtolower(rtrim($toUrl, '/'));
+
+        if ($fromNormalized === $toNormalized) {
+            return;
+        }
+
+        $siteCondition = ['or', ['siteId' => null], ['siteId' => $siteId]];
+
+        // Remove redirects that would shadow the new URI (and cause loops),
+        // e.g. when an element moves back to a previously used slug
+        $loopRecords = RedirectRecord::find()
+            ->where(['lower(TRIM(TRAILING \'/\' FROM [[fromUrl]]))' => $toNormalized])
+            ->andWhere(['matchType' => 'exact'])
+            ->andWhere($siteCondition)
+            ->all();
+
+        foreach ($loopRecords as $record) {
+            $record->delete();
+        }
+
+        // Re-point existing redirects that targeted the old URI, so no chains form
+        $chainRecords = RedirectRecord::find()
+            ->where(['lower(TRIM(TRAILING \'/\' FROM [[toUrl]]))' => $fromNormalized])
+            ->andWhere($siteCondition)
+            ->all();
+
+        foreach ($chainRecords as $record) {
+            $record->toUrl = $toUrl;
+            $record->save();
+        }
+
+        // Upsert the redirect itself
+        $record = RedirectRecord::find()
+            ->where(['lower(TRIM(TRAILING \'/\' FROM [[fromUrl]]))' => $fromNormalized])
+            ->andWhere(['matchType' => 'exact', 'siteId' => $siteId])
+            ->one();
+
+        if (!$record) {
+            $record = new RedirectRecord();
+            $record->siteId = $siteId;
+            $record->fromUrl = $fromUrl;
+            $record->type = $type;
+            $record->matchType = 'exact';
+            $record->notes = 'Automatically created after a URI change.';
+        }
+
+        $record->toUrl = $toUrl;
+        $record->enabled = true;
+        $record->save();
+
+        $this->invalidateCache();
     }
 
     public function deleteRedirectById(int $id): bool
     {
         $record = RedirectRecord::findOne($id);
+        $deleted = $record ? (bool)$record->delete() : false;
 
-        return $record ? (bool)$record->delete() : false;
+        if ($deleted) {
+            $this->invalidateCache();
+        }
+
+        return $deleted;
     }
 
     /**
@@ -202,9 +247,13 @@ class RedirectsService extends Component
      */
     public function bulkSetEnabled(array $ids, bool $enabled): int
     {
-        return Craft::$app->getDb()->createCommand()
+        $count = Craft::$app->getDb()->createCommand()
             ->update('{{%redirects}}', ['enabled' => $enabled], ['id' => $ids])
             ->execute();
+
+        $this->invalidateCache();
+
+        return $count;
     }
 
     /**
@@ -212,9 +261,13 @@ class RedirectsService extends Component
      */
     public function bulkSetType(array $ids, int $type): int
     {
-        return Craft::$app->getDb()->createCommand()
+        $count = Craft::$app->getDb()->createCommand()
             ->update('{{%redirects}}', ['type' => $type], ['id' => $ids])
             ->execute();
+
+        $this->invalidateCache();
+
+        return $count;
     }
 
     /**
@@ -222,7 +275,11 @@ class RedirectsService extends Component
      */
     public function bulkDelete(array $ids): int
     {
-        return RedirectRecord::deleteAll(['id' => $ids]);
+        $count = RedirectRecord::deleteAll(['id' => $ids]);
+
+        $this->invalidateCache();
+
+        return $count;
     }
 
     /**
@@ -233,7 +290,7 @@ class RedirectsService extends Component
         $redirects = $this->getAllRedirects($siteId);
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'site', 'label', 'notes', 'enabled']);
+        fputcsv($handle, ['from', 'to', 'type', 'matchType', 'priority', 'site', 'label', 'notes', 'enabled', 'expiryDate']);
 
         foreach ($redirects as $redirect) {
             $siteHandle = '';
@@ -247,10 +304,12 @@ class RedirectsService extends Component
                 $redirect->toUrl,
                 $redirect->type,
                 $redirect->matchType,
+                $redirect->priority,
                 $siteHandle,
                 $redirect->label,
                 $redirect->notes,
                 $redirect->enabled ? 'yes' : 'no',
+                $redirect->expiryDate ? $redirect->expiryDate->format('Y-m-d H:i:s') : '',
             ]);
         }
 
@@ -272,8 +331,13 @@ class RedirectsService extends Component
             $model->toUrl = $row['toUrl'] ?? null;
             $model->type = !empty($row['type']) ? (int)$row['type'] : 301;
             $model->matchType = $row['matchType'] ?? 'exact';
+            $model->priority = isset($row['priority']) && $row['priority'] !== '' ? (int)$row['priority'] : 0;
             $model->label = $row['label'] ?? null;
             $model->notes = $row['notes'] ?? null;
+
+            if (!empty($row['expiryDate'])) {
+                $model->expiryDate = DateTimeHelper::toDateTime($row['expiryDate']) ?: null;
+            }
 
             // Resolve siteId from row data or use default
             if (!empty($row['siteId'])) {
@@ -309,6 +373,24 @@ class RedirectsService extends Component
         ];
     }
 
+    private function rowToModel(array $row): RedirectModel
+    {
+        $model = new RedirectModel();
+        $model->id = (int)$row['id'];
+        $model->siteId = isset($row['siteId']) && $row['siteId'] !== null ? (int)$row['siteId'] : null;
+        $model->fromUrl = $row['fromUrl'];
+        $model->toUrl = $row['toUrl'];
+        $model->type = (int)$row['type'];
+        $model->matchType = $row['matchType'] ?? 'exact';
+        $model->priority = (int)($row['priority'] ?? 0);
+        $model->label = $row['label'] ?? null;
+        $model->notes = $row['notes'] ?? null;
+        $model->enabled = (bool)$row['enabled'];
+        $model->expiryDate = !empty($row['expiryDate']) ? DateTimeHelper::toDateTime($row['expiryDate']) : null;
+
+        return $model;
+    }
+
     private function recordToModel(RedirectRecord $record): RedirectModel
     {
         $model = new RedirectModel();
@@ -318,9 +400,11 @@ class RedirectsService extends Component
         $model->toUrl = $record->toUrl;
         $model->type = $record->type;
         $model->matchType = $record->matchType ?? 'exact';
+        $model->priority = (int)($record->priority ?? 0);
         $model->label = $record->label;
         $model->notes = $record->notes;
         $model->enabled = (bool)$record->enabled;
+        $model->expiryDate = $record->expiryDate ? DateTimeHelper::toDateTime($record->expiryDate) : null;
 
         return $model;
     }
